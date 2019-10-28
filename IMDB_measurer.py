@@ -6,7 +6,7 @@ from pandas.io.json import json_normalize
 
 # See : https://www.kaggle.com/jboysen/quick-tutorial-flatten-nested-json-in-pandas/notebook
 # 
-
+from datetime import datetime
 
 IMDB_URL = 'https://www.imdb.com'
 
@@ -19,8 +19,6 @@ class imdb:
     def __init__(self,url):
         self.url = url
         self.soup_show = self.make_request(url)
-        # self.scrap_show()
-        # self.scrap_show_array()
 
     def make_request(self,url):
         """ Given a url make a request and return a BeautifulSoup object.
@@ -53,16 +51,20 @@ class imdb:
         # get the div where the episode info is and scrap the usefull content 
         info = epi_tag.find(attrs={'class':'info'})
         
-        # get some info of the episode, can be improved and get more if necessary
+        # get some info of the episode, can be improved and get more if necessaryY
         air_date = re.sub(rx,' ',info.find(attrs={'class':'airdate'}).get_text()).strip()
         try:
-            rating = info.find(attrs={'class':'ipl-rating-star__rating'}).get_text()
-            total_votes = info.find(attrs={'class':'ipl-rating-star__total-votes'}).get_text()
-
+            air_date: datetime.strptime(air_date,'%d %b. %Y')
         except:
-            rating = 'no rating'
-            total_votes = 'no votes'
-        episode_number = info.find(attrs={'itemprop':'episodeNumber'})['content']
+            # no specific date to episode, only year
+            air_date: datetime.strptime(air_date,'%Y')
+        try:
+            rating = float(info.find(attrs={'class':'ipl-rating-star__rating'}).get_text())
+            total_votes = int(info.find(attrs={'class':'ipl-rating-star__total-votes'}).get_text()[1:-1].replace(',',''))
+        except:
+            rating = None
+            total_votes = None
+        episode_number = int(info.find(attrs={'itemprop':'episodeNumber'})['content'])
         episode_description = re.sub(rx,' ',info.find(attrs={'itemprop':'description'}).get_text()).strip()
         episode_title = info.find(attrs={'itemprop':'name'}).get_text()
         episode_info = {
@@ -73,7 +75,8 @@ class imdb:
                 'air_date': air_date,
                 'description': episode_description,
                 'episode_title': episode_title,
-                'season':season
+                'season':season,
+                'short':season+'.E'+str(episode_number)
                 }
             }
         # print(episode_info)
@@ -94,11 +97,11 @@ class imdb:
         # the list of all episodes in imdb page are in a list_item div class
         episodes_html = soup_season.find_all(attrs={'class':'list_item'})
 
-        season_number = soup_season.find(attrs={'id':'episode_top'}).get_text()
+        season_number = soup_season.find(attrs={'id':'episode_top'}).get_text().replace(u'eason\xa0', u'')
         total_episodes = soup_season.find(attrs={'itemprop':'numberofEpisodes'})['content']
         season_info = {
             'season_text':season_number,
-            'total_episodes':total_episodes,
+            'total_episodes':int(total_episodes),
             }
         for epi in episodes_html:
             episode_info = self.scrap_episode(epi,season_number)
@@ -120,7 +123,7 @@ class imdb:
         # the list of all episodes in imdb page are in a list_item div class
         episodes_html = soup_season.find_all(attrs={'class':'list_item'})
 
-        season_number = soup_season.find(attrs={'id':'episode_top'}).get_text()
+        season_number = soup_season.find(attrs={'id':'episode_top'}).get_text().replace(u'eason\xa0', u'')
         total_episodes = soup_season.find(attrs={'itemprop':'numberofEpisodes'})['content']
 
 
@@ -176,7 +179,7 @@ class imdb:
     def get_url(self):
         return self.url
     
-    def get_show_json(self):
+    def get_json(self):
         return self.show
 
     def save_json(self):
@@ -188,3 +191,9 @@ class imdb:
         # d = json_normalize(self.show['seasons'])
         works_data = json_normalize(data=self.show['seasons'], record_path='episodes')
         return works_data
+    def plot(self):
+        df = self.get_dataframe()
+        df = df.sort_values(['info.season','episode_number'])
+        ax = df.plot(x='info.short',y='info.rating')
+        ax.set_xticks(range(len(df['info.short']))) 
+        ax.set_xticklabels([item for item in df['info.short'].tolist()],rotation=0)
