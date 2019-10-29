@@ -1,6 +1,6 @@
 # IMDB Rating Analysis
 
-Make Analysis of the ratings of given TV Show in IMDB across seasons. 
+Scrap IBMD show returning some info and make Analysis of the ratings across seasons.
 
 # About
 
